@@ -1,0 +1,139 @@
+local ScenarioUtils = import('/lua/sim/ScenarioUtilities.lua')
+local ScenarioFramework = import('/lua/ScenarioFramework.lua')
+
+
+--units to be restricted
+    local AIRbuildRestriction = categories.AIR + categories.EXPERIMENTAL + categories.STRATEGIC * (categories.TECH3) + categories.ANTIAIR * (categories.STRUCTURE) + categories.ANTIAIR * (categories.MOBILE)
+
+    local rectSizeX = 5
+    local rectSizeY = 5
+    local radius = 3.5
+    local distance = 2
+    local Color0 = 'FFCEA984'    -- CIVILIAN Color
+    local Color1 = 'FFe80a0a'    -- Cybran red
+    local Color2 = 'ff2e8b57'    -- new green
+    local Color3 = 'FF2929e1'    -- UEF blue
+    local Color4 = 'ffa79602'    -- Sera golden
+    local Color5 = 'ffffffff'    -- white
+    local Color6 = 'FF2F4F4F'    -- dark green
+    local Color7 = 'ff000000'    -- black
+    local Color8 = 'ff901427'    -- dark red
+    local Color9 = 'ff40bf40'    -- mid green
+    local Color10 = 'FF5F01A7'   -- dark purple
+    local Color = {'FFe80a0a', 'ff2e8b57', 'FF2929e1', 'ffa79602', 'ffffffff', 'FF2F4F4F', 'ff000000', 'ff901427', 'ff40bf40', 'FF5F01A7'}
+
+
+function OnPopulate()
+    ScenarioUtils.InitializeArmies()
+        local tblArmy = ListArmies()
+        for index, army in tblArmy do
+        ScenarioFramework.AddRestriction(army, AIRbuildRestriction)   
+        end
+
+	local self = import('/lua/sim/Entity.lua').Entity()
+	for k = 1, 99 do
+		local entryName = 'Entry_' .. k
+		local exitName = 'Exit_' .. k
+		local midpointName = 'Midpoint_' .. k
+		local entryPos = ScenarioUtils.MarkerToPosition(entryName)
+		local exitPos = ScenarioUtils.MarkerToPosition(exitName)
+		local MIDPOINTPos = ScenarioUtils.MarkerToPosition(midpointName)
+		
+		ForkThread(TeleportThread, self, entryPos, exitPos)
+		CreateTeleportMaintenanceEffects(entryPos, exitPos)
+	end
+end
+
+
+	
+
+
+TeleportThread = function(self, entryPos, exitPos)
+	local telUnits
+	local killUnits
+	local	ferrymanX
+	while true do
+    for INDEX, BRAIN in ArmyBrains do	
+		telUnits = BRAIN:GetUnitsAroundPoint( categories.MOBILE, entryPos, 3.5, 'Ally')
+		killUnits = BRAIN:GetUnitsAroundPoint( categories.MOBILE, exitPos, 3.5, 'Ally')
+		ferrymanX = BRAIN:GetUnitsAroundPoint( categories.ENGINEER, MIDPOINTPos, 5.5, 'Ally')
+
+		
+		if ferrymanX ~= nil then
+			if table.getn(ferrymanX) >= 1 then
+		if telUnits ~= nil then
+			if table.getn(telUnits) >= 1 then
+				for k, v in telUnits do
+					if table.find(v:GetBlueprint().Categories,'AIR')  then	
+					#v:GetPosition()
+					else
+					      local MaxHealthofUnit = v:GetMaxHealth()
+					      ForkThread(WarpThread,self, entryPos, exitPos, v)
+					end
+				end
+			end
+		end
+		if killUnits ~= nil then
+			if table.getn(killUnits) >= 1 then
+				for k, v in killUnits do
+					if table.find(v:GetBlueprint().Categories,'STRUCTURE') then
+						v:Destroy()
+					end
+				end
+			end
+		end
+		end
+    end
+		end
+		WaitSeconds(3)
+	end
+end
+
+WarpThread = function(self, entryPos, exitPos, v)
+	local ex, ey, ez = unpack(entryPos)
+	local tx, ty, tz = unpack(exitPos)
+
+	if table.find(v:GetBlueprint().Categories,'MOBILE') or table.find(v:GetBlueprint().Categories,'PROJECTILE') then
+           if ex >= tx and ez > tz then
+			Warp(v, Vector( tx-rectSizeX+Random(-rectSizeX/0.1, 0)/10, ty, tz-rectSizeX+Random(-rectSizeX/0.1, 0)/10))
+			#print('uzoom')
+           end
+           if ex >= tx and ez <= tz then
+			Warp(v, Vector( tx-rectSizeX+Random(-rectSizeX/0.1, 0)/10, ty, tz+rectSizeX+Random(0, rectSizeX/0.1)/10))
+			#print('uzoom')
+           end
+           if ex < tx and ez > tz then
+			Warp(v, Vector( tx+rectSizeX+Random(0, rectSizeX/0.1)/10, ty, tz-rectSizeX+Random(-rectSizeX/0.1, 0)/10))
+			#print('uzoom')
+           end
+           if ex < tx and ez <= tz then
+			Warp(v, Vector( tx+rectSizeX+Random(0, rectSizeX/0.1)/10, ty, tz+rectSizeX+Random(0, rectSizeX/0.1)/10))
+			#print('uzoom')
+           end
+	elseif table.find(v:GetBlueprint().Categories,'STRUCTURE') then
+		v:Destroy()
+	end
+end
+
+function CreateTeleportMaintenanceEffects (entryPos, exitPos)
+	#local ex, ey, ez = unpack(entryPos)
+	#local tx, ty, tz = unpack(exitPos)
+
+
+	#CreateUnitHPR('uel0001', 1, ex - rectSizeX/2, ey,ez - rectSizeY/2 , -180, 0, 0) 
+	#CreateUnitHPR('uel0001', 1, ex + rectSizeX/2, ey,ez - rectSizeY/2 , -180, 0, 0) 
+	#CreateUnitHPR('uel0001', 1, ex - rectSizeX/2, ey,ez + rectSizeY/2 , -180, 0, 0) 
+	#CreateUnitHPR('uel0001', 1, ex + rectSizeX/2, ey,ez + rectSizeY/2 , -180, 0, 0) 
+	
+	local entryEnt = import('/lua/sim/Entity.lua').Entity()
+	local exitEnt = import('/lua/sim/Entity.lua').Entity()
+	Warp(entryEnt, Vector(entryPos[1],entryPos[2] + 0.2,entryPos[3] ))
+	Warp( exitEnt, Vector(exitPos[1],exitPos[2] + 0.2,exitPos[3] ))	
+end
+
+
+function OnStart(self)
+end	
+	    
+	    
+	    
